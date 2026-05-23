@@ -47,7 +47,29 @@ pub struct SliceArg {
 
 impl SliceArg {
     /// A slice that selects the full axis (`..`).
-    pub const FULL: Self = Self { start: None, stop: None, step: None };
+    pub const FULL: Self = Self {
+        start: None,
+        stop: None,
+        step: None,
+    };
+
+    /// Returns a SliceArg that selects the entire axis.
+    ///
+    /// Equivalent to Python's `:` slice syntax.
+    ///
+    /// This is equivalent to:
+    ///
+    /// ```rust
+    /// SliceArg {
+    ///     start: None,
+    ///     stop: None,
+    ///     step: None,
+    /// }
+    /// ```
+    #[inline]
+    pub fn full() -> Self {
+        Self::FULL
+    }
 
     /// Resolves this `SliceArg` against an axis of length `dim`, returning
     /// `(start_index, element_count, step)` in element units.
@@ -79,17 +101,29 @@ impl SliceArg {
             let e = self
                 .stop
                 .map(|v| {
-                    if v < 0 { ((v + idim).max(-1)) as usize } else { (v as usize).min(dim) }
+                    if v < 0 {
+                        ((v + idim).max(-1)) as usize
+                    } else {
+                        (v as usize).min(dim)
+                    }
                 })
-                .unwrap_or(usize::MAX); // sentinel for "before index 0"
+                .unwrap_or(usize::MAX);
+
             (s, e)
         };
 
         let count = if step > 0 {
-            if stop <= start { 0 } else { (stop - start + (step as usize) - 1) / (step as usize) }
+            if stop <= start {
+                0
+            } else {
+                (stop - start + (step as usize) - 1) / (step as usize)
+            }
         } else {
             let abs_step = (-step) as usize;
-            if e_reversed_empty(start, stop) { 0 } else {
+
+            if e_reversed_empty(start, stop) {
+                0
+            } else {
                 (start.saturating_sub(stop) + abs_step - 1) / abs_step
             }
         };
@@ -571,5 +605,32 @@ impl std::fmt::Display for Layout {
                self.shape.as_slice(),
                self.strides.as_slice(),
                self.itemsize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slicearg_full_equivalent_to_explicit() {
+        let full = SliceArg::full();
+
+        let explicit = SliceArg {
+            start: None,
+            stop: None,
+            step: None,
+        };
+
+        assert_eq!(full, explicit);
+    }
+
+    #[test]
+    fn slicearg_full_selects_entire_axis() {
+        let dim = 10;
+
+        let resolved = SliceArg::full().resolve(dim).unwrap();
+
+        assert_eq!(resolved, (0, dim, 1));
     }
 }
